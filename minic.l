@@ -6,6 +6,9 @@ alpha [a-zA-Z]+
 header #include[ ]<[a-z]+\.h>
 datatype "int"|"float"|"char"
 digit [0-9]+(\.[0-9]+)?
+string_literal \".*\"
+comp "=="|"<"|">"
+unary "++"|"--"
 %%
 
 {header} {strcpy(yylval.token_data.name,(yytext));return INCLUDES;}
@@ -19,7 +22,12 @@ digit [0-9]+(\.[0-9]+)?
 "}" {strcpy(yylval.token_data.name,(yytext));return C_CLOSE;}
 "=" {strcpy(yylval.token_data.name,(yytext));return EQL;}
 ";" {strcpy(yylval.token_data.name,(yytext));return SEMI;}
+{comp} {strcpy(yylval.token_data.name,(yytext));return COMP;}
+{string_literal} {strcpy(yylval.token_data.name,(yytext));return STR_LITERAL;}
+{unary} {strcpy(yylval.token_data.name,(yytext));return UNARY;} 
+"for" {strcpy(yylval.token_data.name,(yytext));return FOR;}
 "\n" line_no++;
+[ \t]+ ;
 {alpha} {strcpy(yylval.token_data.name,(yytext));return ID;}
 %%
 

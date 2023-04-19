@@ -12,12 +12,16 @@ struct SymbolTable {
 char current_data_type[10];
 int symbol_table_counter = 0;
 
+int label_counter=0;
 enum VarType { var,func };
 void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
 }
-void add_to_symbol_table(enum VarType vt);
+void add_to_symbol_table(enum VarType vt,char * name);
 
+char c_for_condition[20];
+char c_for_action[20];
+char c_for_label[20];
  struct token_node {
     struct token_node * left;
     struct token_node * right;
@@ -35,6 +39,8 @@ struct token_node* bootstrap_node(struct token_node * left, struct token_node * 
    return base_node;
 }
 
+int tac = 0;
+char * three_address_code[100];
 
 %}
 
@@ -45,45 +51,92 @@ struct token_node* bootstrap_node(struct token_node * left, struct token_node * 
 	} token_data; 
 } 
 
-%token <token_data> DATATYPE MAIN INT NUMBER ID INCLUDES B_OPEN B_CLOSE C_OPEN C_CLOSE EQL SEMI
-%type <token_data> PROGRAM FUNCTION FUNCTIONS MAIN_FUNC NORMAL_FUNC INCLUDE_STM BODY STATEMENT ASSIGN DATATYPE_ALL
+%token <token_data> UNARY COMP FOR DATATYPE MAIN INT NUMBER ID INCLUDES B_OPEN B_CLOSE C_OPEN C_CLOSE EQL SEMI STR_LITERAL
+%type <token_data> LITERAL PROGRAM FUNCTION FUNCTIONS MAIN_FUNC NORMAL_FUNC INCLUDE_STM BODY STATEMENT ASSIGN DATATYPE_ALL
 
 %%
 
 
 PROGRAM: INCLUDE_STM FUNCTIONS {$$.nd=bootstrap_node($1.nd,$2.nd,"program");head=$$.nd;}
 ;
-FUNCTIONS: MAIN_FUNC NORMAL_FUNC {$$.nd=bootstrap_node($1.nd,$2.nd,$1.name);}
+FUNCTIONS: MAIN_FUNC NORMAL_FUNC {
+    $$.nd=bootstrap_node($1.nd,$2.nd,"functions");
+}
 ;
-MAIN_FUNC: INT MAIN {add_to_symbol_table(func)} B_OPEN B_CLOSE BODY {$$.nd=$6.nd}
+MAIN_FUNC: INT MAIN {add_to_symbol_table(func,$2.name)} {
+    char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"LABEL %s:\n","main");
+    three_address_code[tac++] = max;
+} B_OPEN B_CLOSE BODY {$$.nd=$6.nd} 
 ;
-NORMAL_FUNC: FUNCTION NORMAL_FUNC {$$.nd=bootstrap_node($1.nd,$2.nd,$1.name);} | {}
+NORMAL_FUNC: FUNCTION NORMAL_FUNC {
+    $$.nd=bootstrap_node($1.nd,$2.nd,$1.nd->val);
+    char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"LABEL %s:\n",$1.nd->val);
+    three_address_code[tac++] = max;
+} | {}
 ;
 INCLUDE_STM:  INCLUDES {$$.nd=bootstrap_node(NULL,NULL,$1.name);} | INCLUDE_STM INCLUDES {$$.nd=bootstrap_node($1.nd,NULL,$1.name);}
 ;
 BODY: C_OPEN STATEMENT C_CLOSE {$$.nd=bootstrap_node($2.nd,NULL,"body");}
 ;
-STATEMENT:  ASSIGN STATEMENT SEMI {$$.nd=bootstrap_node($1.nd,$2.nd,"statement");} | {}
+STATEMENT:  FOR_LOOP | ASSIGN SEMI | FUNC_CALL SEMI | STATEMENT STATEMENT  {$$.nd=bootstrap_node($1.nd,$2.nd,"statement");} | {}
 ;
-ASSIGN: DATATYPE_ALL ID {add_to_symbol_table(var)} EQL NUMBER {$$.nd=bootstrap_node($1.nd,$2.nd,$2.name);}
+
+FOR_LOOP: FOR {
+    char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"L%d:\n",++label_counter);
+    sprintf(c_for_label,"L%d",label_counter);
+} B_OPEN ASSIGN {
+	char * label_declaration=(char *)malloc(sizeof(c_for_label)+100);
+    sprintf(label_declaration,"%s:\n",c_for_label);
+    three_address_code[tac++] = label_declaration;
+    } SEMI ID COMP NUMBER {
+    char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"IF %s %s %s GOTO %s\n",$7.name,$8.name,$9.name,c_for_label);
+    strcpy(c_for_condition,max);
+} SEMI ID UNARY B_CLOSE BODY {
+   	char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"%s%s\n",$7.name,$13.name);
+    three_address_code[tac++] = max;
+    three_address_code[tac++] = strdup(c_for_condition);
+    }
+FUNC_CALL: ID B_OPEN B_CLOSE {
+    char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"GOTO = %s\n","DUNNO");
+    three_address_code[tac++] = max;
+    }
+ASSIGN: DATATYPE_ALL ID {add_to_symbol_table(var,$2.name)} EQL LITERAL {
+    $$.nd=bootstrap_node($1.nd,NULL,$2.name);
+    char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"%s = %s\n",$2.name,$5.name);
+    three_address_code[tac++] = max;
+    } | ID EQL LITERAL {
+    $$.nd=bootstrap_node(NULL,NULL,$1.name);
+    char *max=(char *)malloc(sizeof($1.nd->val)+10);
+    sprintf(max,"%s = %s\n",$1.name,$3.name);
+    three_address_code[tac++] = max;
+    }
 ;
-DATATYPE_ALL: DATATYPE {$$.nd=bootstrap_node(NULL,NULL,$1.name);} | 
+
+LITERAL: NUMBER | STR_LITERAL
+DATATYPE_ALL: DATATYPE {strcpy(current_data_type,yytext);$$.nd=bootstrap_node(NULL,NULL,$1.name);} | 
               INT {strcpy(current_data_type,yytext)}  {$$.nd=bootstrap_node(NULL,NULL,$1.name);}
 ;
-FUNCTION: DATATYPE_ALL ID {add_to_symbol_table(func)} B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($1.nd,$2.nd,$2.name);}
+FUNCTION: DATATYPE_ALL ID {add_to_symbol_table(func,$2.name)} B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($1.nd,$2.nd,$2.name);}
 ;
 
 %%
 
-void add_to_symbol_table(enum VarType vt) {
+void add_to_symbol_table(enum VarType vt,char * name) {
         if(vt == var) {
-			symbol_table[symbol_table_counter].name=strdup(yytext);
+			symbol_table[symbol_table_counter].name=strdup(name);
 			symbol_table[symbol_table_counter].datatype=strdup(current_data_type);
 			symbol_table[symbol_table_counter].line_no=line_no;
 			symbol_table[symbol_table_counter].type=strdup("Variable");
 		}
 		else if(vt == func) {
-			symbol_table[symbol_table_counter].name=strdup(yytext);
+			symbol_table[symbol_table_counter].name=strdup(name);
 			symbol_table[symbol_table_counter].datatype=strdup(current_data_type);
 			symbol_table[symbol_table_counter].line_no=line_no;
 			symbol_table[symbol_table_counter].type=strdup("Function");
@@ -114,9 +167,16 @@ void printtree(struct token_node* tree) {
 	printf("\n\n");
 }
 
+void print_tac(){
+    printf("Three Address Code\n");
+    for (int i = 0; i < tac; i++){
+        printf("%s",three_address_code[i]);
+    }
+}
 
 int main(){
     yyparse();
     print_symbol_table();
     printtree(head);
+    print_tac();
 }
