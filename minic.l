@@ -26,6 +26,7 @@ unary "++"|"--"
 {string_literal} {strcpy(yylval.token_data.name,(yytext));return STR_LITERAL;}
 {unary} {strcpy(yylval.token_data.name,(yytext));return UNARY;} 
 "for" {strcpy(yylval.token_data.name,(yytext));return FOR;}
+"while" {strcpy(yylval.token_data.name,(yytext));return WHILE;}
 "\n" line_no++;
 [ \t]+ ;
 {alpha} {strcpy(yylval.token_data.name,(yytext));return ID;}
