@@ -10,7 +10,7 @@ struct SymbolTable {
 } symbol_table[100];
 char current_data_type[10];
 int symbol_table_counter = 0;
-
+void check_if_not_declared(char * name);
 int label_counter=0;
 int label_skip_loop=0;
 enum VarType { var,func };
@@ -87,6 +87,7 @@ STATEMENT:  FOR_LOOP | WHILE_LOOP | ASSIGN SEMI | FUNC_CALL SEMI | STATEMENT STA
 WHILE_LOOP: WHILE {
     sprintf(c_label,"L%d",label_counter++);
 } B_OPEN ID COMP NUMBER {
+    check_if_not_declared($4.name);
     char *max=(char *)malloc(sizeof(c_label)+10);
     sprintf(max,"IF %s %s %s GOTO %s\n",$4.name,$5.name,$6.name,c_label);
     three_address_code[tac++] = max;
@@ -145,6 +146,7 @@ ASSIGN: DATATYPE_ALL ID {add_to_symbol_table(var,$2.name)} EQL LITERAL {
     sprintf(max,"%s = %s\n",$2.name,$5.name);
     three_address_code[tac++] = max;
     } | ID EQL LITERAL {
+    check_if_not_declared($1.name);
     $$.nd=bootstrap_node(NULL,NULL,$1.name);
     char *max=(char *)malloc(sizeof($1.nd->val)+10);
     sprintf(max,"%s = %s\n",$1.name,$3.name);
@@ -161,6 +163,18 @@ FUNCTION: DATATYPE_ALL ID {add_to_symbol_table(func,$2.name)} B_OPEN B_CLOSE BOD
 
 %%
 
+void check_if_not_declared(char * name){
+     for(int j=0;j<symbol_table_counter;j++){
+                if(strcmp(symbol_table[j].name,name)==0){
+                    return;
+                };
+                
+            }
+            char * m = (char *)malloc(10);
+                sprintf(m,"Not declared: %s",name);
+                yyerror(m);
+                exit(1);
+}
 void add_to_symbol_table(enum VarType vt,char * name) {
      for(int j=0;j<symbol_table_counter;j++){
                 if(strcmp(symbol_table[j].name,name)==0){
