@@ -53,7 +53,7 @@ int fltac=0;
 } 
 
 %token <token_data> UNARY COMP FOR DATATYPE MAIN INT NUMBER ID INCLUDES B_OPEN B_CLOSE C_OPEN C_CLOSE EQL SEMI STR_LITERAL WHILE
-%type <token_data> LITERAL PROGRAM FUNCTION FUNCTIONS MAIN_FUNC NORMAL_FUNC INCLUDE_STM BODY STATEMENT ASSIGN DATATYPE_ALL
+%type <token_data> WHILE_LOOP FOR_LOOP LITERAL PROGRAM FUNCTION FUNCTIONS MAIN_FUNC NORMAL_FUNC INCLUDE_STM BODY STATEMENT ASSIGN DATATYPE_ALL
 
 %%
 
@@ -68,7 +68,7 @@ MAIN_FUNC: INT MAIN {add_to_symbol_table(func,$2.name)} {
     char *max=(char *)malloc(sizeof($1.nd->val)+10);
     sprintf(max,"LABEL %s:\n","main");
     three_address_code[tac++] = max;
-} B_OPEN B_CLOSE BODY {$$.nd=$6.nd} 
+} B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($7.nd,NULL,"main");} 
 ;
 NORMAL_FUNC: FUNCTION NORMAL_FUNC {
     $$.nd=bootstrap_node($1.nd,$2.nd,$1.nd->val);
@@ -77,7 +77,7 @@ NORMAL_FUNC: FUNCTION NORMAL_FUNC {
     three_address_code[tac++] = max;
 } | {}
 ;
-INCLUDE_STM:  INCLUDES {$$.nd=bootstrap_node(NULL,NULL,$1.name);} | INCLUDE_STM INCLUDES {$$.nd=bootstrap_node($1.nd,NULL,$1.name);}
+INCLUDE_STM:  INCLUDES {$$.nd=bootstrap_node(NULL,NULL,"include");} | INCLUDE_STM INCLUDES {$$.nd=bootstrap_node($1.nd,NULL,$1.name);}
 ;
 BODY: C_OPEN STATEMENT C_CLOSE {$$.nd=bootstrap_node($2.nd,NULL,"body");}
 ;
@@ -103,6 +103,7 @@ WHILE_LOOP: WHILE {
 
     strcpy(c_loop_condition,max);
 } B_CLOSE BODY {
+    $$.nd=bootstrap_node($9.nd,NULL,"while");
      three_address_code[tac++] = strdup(c_loop_condition);
      char *max2=(char *)malloc(sizeof($1.nd->val)+10);
      sprintf(max2,"L%d:\n",label_skip_loop);
@@ -127,6 +128,7 @@ FOR_LOOP: FOR {
     
     strcpy(c_loop_condition,max);
 } SEMI ID UNARY B_CLOSE BODY {
+    $$.nd=bootstrap_node($15.nd,NULL,"for");
    	char *max=(char *)malloc(sizeof($1.nd->val)+10);
     sprintf(max,"%s%s\n",$12.name,$13.name);
     three_address_code[tac++] = max;
@@ -141,13 +143,13 @@ FUNC_CALL: ID B_OPEN B_CLOSE {
     three_address_code[tac++] = max;
     }
 ASSIGN: DATATYPE_ALL ID {add_to_symbol_table(var,$2.name)} EQL LITERAL {
-    $$.nd=bootstrap_node($1.nd,NULL,$2.name);
+    $$.nd=bootstrap_node($1.nd,NULL,"assign");
     char *max=(char *)malloc(sizeof($1.nd->val)+10);
     sprintf(max,"%s = %s\n",$2.name,$5.name);
     three_address_code[tac++] = max;
     } | ID EQL LITERAL {
     check_if_not_declared($1.name);
-    $$.nd=bootstrap_node(NULL,NULL,$1.name);
+    $$.nd=bootstrap_node(NULL,NULL,"assign");
     char *max=(char *)malloc(sizeof($1.nd->val)+10);
     sprintf(max,"%s = %s\n",$1.name,$3.name);
     three_address_code[tac++] = max;
@@ -175,6 +177,7 @@ void check_if_not_declared(char * name){
                 yyerror(m);
                 exit(1);
 }
+
 void add_to_symbol_table(enum VarType vt,char * name) {
      for(int j=0;j<symbol_table_counter;j++){
                 if(strcmp(symbol_table[j].name,name)==0){
@@ -207,19 +210,16 @@ void print_symbol_table(){
     }
 }
 
-void printInorder(struct token_node *tree) {
-	int i;
-	if (tree->left) {
-		printInorder(tree->left);
-	}
-	printf("%s, ", tree->val);
-	if (tree->right) {
-		printInorder(tree->right);
-	}
+void preOrder(struct token_node *tree) {
+    if(tree){
+        printf("%s, ", tree->val);
+        preOrder(tree->left);
+        preOrder(tree->right);
+    }
 }
 void printtree(struct token_node* tree) {
-	printf("\n\n Inorder traversal of the Parse Tree: \n\n");
-	printInorder(tree);
+	printf("\n\n preorder traversal of the Parse Tree: \n\n");
+	preOrder(tree);
 	printf("\n\n");
 }
 
@@ -236,3 +236,10 @@ int main(){
     printtree(head);
     print_tac();
 }
+
+
+
+//max new phases
+//lexical -> l vale
+//syntax -> tree
+//intermidiate -> tac
