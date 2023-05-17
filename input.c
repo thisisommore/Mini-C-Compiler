@@ -1,4 +1,5 @@
 #include <stdio.h>
+
 int main()
 {
     int r = 4;
@@ -9,7 +10,7 @@ int main()
     {
         int ger = 23;
     }
-    for (int j = 34; j < 43; j++)
+    for (int j = 34; j <= 43; j++)
     {
         int gefef = 23;
     }
