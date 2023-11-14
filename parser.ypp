@@ -1,7 +1,9 @@
 %{
+extern int line_no;
 #include <stdio.h>
 #include <string.h>
-#include "lex.yy.c"
+#include "lexer.hpp"
+#include "ast.cpp"
 struct SymbolTable {
  char * name;
  char * datatype;
@@ -31,7 +33,7 @@ struct token_node * head;
 
 
 struct token_node* bootstrap_node(struct token_node * left, struct token_node * right,char * token){
-   struct token_node * base_node =(struct node *) malloc(sizeof(struct token_node));
+   struct token_node * base_node =(struct token_node *) malloc(sizeof(struct token_node));
    base_node->left = left;
    base_node->right = right;
    char *_token = (char *)malloc(strlen(token)+1);
@@ -52,7 +54,7 @@ int fltac=0;
 	} token_data; 
 } 
 
-%token <token_data> UNARY COMP FOR DATATYPE MAIN INT NUMBER ID INCLUDES B_OPEN B_CLOSE C_OPEN C_CLOSE EQL SEMI STR_LITERAL WHILE
+%token <token_data> UNARY COMP FOR DATATYPE MAIN INT NUMBER ID_ INCLUDES B_OPEN B_CLOSE C_OPEN C_CLOSE EQL SEMI STR_LITERAL WHILE
 %type <token_data> WHILE_LOOP FOR_LOOP LITERAL PROGRAM FUNCTION FUNCTIONS MAIN_FUNC NORMAL_FUNC INCLUDE_STM BODY STATEMENT ASSIGN DATATYPE_ALL
 
 %%
@@ -65,16 +67,10 @@ FUNCTIONS: MAIN_FUNC NORMAL_FUNC {
 }
 ;
 MAIN_FUNC: INT MAIN {add_to_symbol_table(func,$2.name)} {
-    char *max=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max,"LABEL %s:\n","main");
-    three_address_code[tac++] = max;
 } B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($7.nd,NULL,"main");} 
 ;
 NORMAL_FUNC: FUNCTION NORMAL_FUNC {
     $$.nd=bootstrap_node($1.nd,$2.nd,$1.nd->val);
-    char *max=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max,"LABEL %s:\n",$1.nd->val);
-    three_address_code[tac++] = max;
 } | {}
 ;
 INCLUDE_STM:  INCLUDES {$$.nd=bootstrap_node(NULL,NULL,"include");} | INCLUDE_STM INCLUDES {$$.nd=bootstrap_node($1.nd,NULL,$1.name);}
@@ -86,73 +82,29 @@ STATEMENT:  FOR_LOOP | WHILE_LOOP | ASSIGN SEMI | FUNC_CALL SEMI | STATEMENT STA
 
 WHILE_LOOP: WHILE {
     sprintf(c_label,"L%d",label_counter++);
-} B_OPEN ID COMP NUMBER {
+} B_OPEN ID_ COMP NUMBER {
     check_if_not_declared($4.name);
-    char *max=(char *)malloc(sizeof(c_label)+10);
-    sprintf(max,"IF %s %s %s GOTO %s\n",$4.name,$5.name,$6.name,c_label);
-    three_address_code[tac++] = max;
     
-    char * skip_loop=(char *)malloc(sizeof(c_label)+100);
-    label_skip_loop=label_counter++;
-    sprintf(skip_loop,"GOTO L%d\n",label_skip_loop);
-    three_address_code[tac++] = skip_loop;
 
-    char * label_declaration=(char *)malloc(sizeof(c_label)+100);
-    sprintf(label_declaration,"%s:\n",c_label);
-    three_address_code[tac++] = label_declaration;
 
-    strcpy(c_loop_condition,max);
 } B_CLOSE BODY {
     $$.nd=bootstrap_node($9.nd,NULL,"while");
-     three_address_code[tac++] = strdup(c_loop_condition);
-     char *max2=(char *)malloc(sizeof($1.nd->val)+10);
-     sprintf(max2,"L%d:\n",label_skip_loop);
-     three_address_code[tac++] = max2;
 };
 FOR_LOOP: FOR {
     sprintf(c_label,"L%d",label_counter++);
 } B_OPEN ASSIGN {
-} SEMI ID COMP NUMBER {
-    char *max=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max,"IF %s %s %s GOTO %s\n",$7.name,$8.name,$9.name,c_label);
-    three_address_code[tac++] = max;
+} SEMI ID_ COMP NUMBER {
     
-    char * skip_loop=(char *)malloc(sizeof(c_label)+100);
-    label_skip_loop=label_counter++;
-    sprintf(skip_loop,"GOTO L%d\n",label_skip_loop);
-    three_address_code[tac++] = skip_loop;
-
-    char * label_declaration=(char *)malloc(sizeof(c_label)+100);
-    sprintf(label_declaration,"%s:\n",c_label);
-    three_address_code[tac++] = label_declaration;
-    
-    strcpy(c_loop_condition,max);
-} SEMI ID UNARY B_CLOSE BODY {
+} SEMI ID_ UNARY B_CLOSE BODY {
     $$.nd=bootstrap_node($15.nd,NULL,"for");
-   	char *max=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max,"%s%s\n",$12.name,$13.name);
-    three_address_code[tac++] = max;
-    three_address_code[tac++] = strdup(c_loop_condition);
-    char *max2=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max2,"L%d:\n",label_skip_loop);
-    three_address_code[tac++] = max2;
     }
-FUNC_CALL: ID B_OPEN B_CLOSE {
-    char *max=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max,"GOTO = %s\n","DUNNO");
-    three_address_code[tac++] = max;
+FUNC_CALL: ID_ B_OPEN B_CLOSE {
     }
-ASSIGN: DATATYPE_ALL ID {add_to_symbol_table(var,$2.name)} EQL LITERAL {
+ASSIGN: DATATYPE_ALL ID_ {add_to_symbol_table(var,$2.name)} EQL LITERAL {
     $$.nd=bootstrap_node($1.nd,NULL,"assign");
-    char *max=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max,"%s = %s\n",$2.name,$5.name);
-    three_address_code[tac++] = max;
-    } | ID EQL LITERAL {
+    } | ID_ EQL LITERAL {
     check_if_not_declared($1.name);
     $$.nd=bootstrap_node(NULL,NULL,"assign");
-    char *max=(char *)malloc(sizeof($1.nd->val)+10);
-    sprintf(max,"%s = %s\n",$1.name,$3.name);
-    three_address_code[tac++] = max;
     }
 ;
 
@@ -160,7 +112,7 @@ LITERAL: NUMBER | STR_LITERAL
 DATATYPE_ALL: DATATYPE {strcpy(current_data_type,yytext);$$.nd=bootstrap_node(NULL,NULL,$1.name);} | 
               INT {strcpy(current_data_type,yytext)}  {$$.nd=bootstrap_node(NULL,NULL,$1.name);}
 ;
-FUNCTION: DATATYPE_ALL ID {add_to_symbol_table(func,$2.name)} B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($1.nd,$2.nd,$2.name);}
+FUNCTION: DATATYPE_ALL ID_ {add_to_symbol_table(func,$2.name)} B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($1.nd,$2.nd,$2.name);}
 ;
 
 %%
@@ -226,7 +178,6 @@ void printtree(struct token_node* tree) {
 void print_tac(){
     printf("Three Address Code\n");
     for (int i = 0; i < tac; i++){
-        printf("%s",three_address_code[i]);
     }
 }
 
