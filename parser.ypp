@@ -1,196 +1,52 @@
+%code requires {
+  #include "ast.hpp"
+      enum E_l_type {
+    str,dec
+};
+}
 %{
 extern int line_no;
 #include <stdio.h>
 #include <string.h>
 #include "lexer.hpp"
-#include "ast.cpp"
-struct SymbolTable {
- char * name;
- char * datatype;
- char * type;
- int line_no;
-} symbol_table[100];
-char current_data_type[10];
-int symbol_table_counter = 0;
-void check_if_not_declared(char * name);
-int label_counter=0;
-int label_skip_loop=0;
-enum VarType { var,func };
 void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
 }
-void add_to_symbol_table(enum VarType vt,char * name);
 
-char c_loop_condition[100];
-char c_for_action[20];
-char c_label[20];
- struct token_node {
-    struct token_node * left;
-    struct token_node * right;
-    char * val;
- };
-struct token_node * head;
-
-
-struct token_node* bootstrap_node(struct token_node * left, struct token_node * right,char * token){
-   struct token_node * base_node =(struct token_node *) malloc(sizeof(struct token_node));
-   base_node->left = left;
-   base_node->right = right;
-   char *_token = (char *)malloc(strlen(token)+1);
-   strcpy(_token, token);
-   base_node->val=_token;
-   return base_node;
-}
-
-int tac = 0;
-char * three_address_code[100];
-int fltac=0;
 %}
 
+
 %union { 
+
 	struct TokenData { 
-		char name[100]; 
-		struct token_node* nd;
+		char value[100];
+        enum E_l_type l_type; 
+		struct ExprNode* nd;
 	} token_data; 
 } 
 
-%token <token_data> UNARY COMP FOR DATATYPE MAIN INT NUMBER ID_ INCLUDES B_OPEN B_CLOSE C_OPEN C_CLOSE EQL SEMI STR_LITERAL WHILE
-%type <token_data> WHILE_LOOP FOR_LOOP LITERAL PROGRAM FUNCTION FUNCTIONS MAIN_FUNC NORMAL_FUNC INCLUDE_STM BODY STATEMENT ASSIGN DATATYPE_ALL
+%token <token_data> INT ID_ NUMBER SEMI EQ MAIN C_OPEN C_CLOSE B_OPEN B_CLOSE
+%type <token_data> STATEMENTS LITERAL
 
 %%
 
 
-PROGRAM: INCLUDE_STM FUNCTIONS {$$.nd=bootstrap_node($1.nd,$2.nd,"program");head=$$.nd;}
-;
-FUNCTIONS: MAIN_FUNC NORMAL_FUNC {
-    $$.nd=bootstrap_node($1.nd,$2.nd,"functions");
-}
-;
-MAIN_FUNC: INT MAIN {add_to_symbol_table(func,$2.name)} {
-} B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($7.nd,NULL,"main");} 
-;
-NORMAL_FUNC: FUNCTION NORMAL_FUNC {
-    $$.nd=bootstrap_node($1.nd,$2.nd,$1.nd->val);
-} | {}
-;
-INCLUDE_STM:  INCLUDES {$$.nd=bootstrap_node(NULL,NULL,"include");} | INCLUDE_STM INCLUDES {$$.nd=bootstrap_node($1.nd,NULL,$1.name);}
-;
-BODY: C_OPEN STATEMENT C_CLOSE {$$.nd=bootstrap_node($2.nd,NULL,"body");}
-;
-STATEMENT:  FOR_LOOP | WHILE_LOOP | ASSIGN SEMI | FUNC_CALL SEMI | STATEMENT STATEMENT  {$$.nd=bootstrap_node($1.nd,$2.nd,"statement");} | {}
-;
+PROGRAM: INT MAIN B_OPEN B_CLOSE BODY
 
-WHILE_LOOP: WHILE {
-    sprintf(c_label,"L%d",label_counter++);
-} B_OPEN ID_ COMP NUMBER {
-    check_if_not_declared($4.name);
-    
+BODY: C_OPEN STATEMENTS C_CLOSE
+STATEMENTS:  STATEMENT STATEMENTS 
+            | ;
+STATEMENT: INT ID_ EQ NUMBER {
+    auto var = Builder->CreateAlloca(Builder->getInt32Ty(), 0, $2.value);
+    Builder->CreateStore(Builder->getInt32(stoi($4.value)), var);
+} SEMI
 
-
-} B_CLOSE BODY {
-    $$.nd=bootstrap_node($9.nd,NULL,"while");
-};
-FOR_LOOP: FOR {
-    sprintf(c_label,"L%d",label_counter++);
-} B_OPEN ASSIGN {
-} SEMI ID_ COMP NUMBER {
-    
-} SEMI ID_ UNARY B_CLOSE BODY {
-    $$.nd=bootstrap_node($15.nd,NULL,"for");
-    }
-FUNC_CALL: ID_ B_OPEN B_CLOSE {
-    }
-ASSIGN: DATATYPE_ALL ID_ {add_to_symbol_table(var,$2.name)} EQL LITERAL {
-    $$.nd=bootstrap_node($1.nd,NULL,"assign");
-    } | ID_ EQL LITERAL {
-    check_if_not_declared($1.name);
-    $$.nd=bootstrap_node(NULL,NULL,"assign");
-    }
-;
-
-LITERAL: NUMBER | STR_LITERAL
-DATATYPE_ALL: DATATYPE {strcpy(current_data_type,yytext);$$.nd=bootstrap_node(NULL,NULL,$1.name);} | 
-              INT {strcpy(current_data_type,yytext)}  {$$.nd=bootstrap_node(NULL,NULL,$1.name);}
-;
-FUNCTION: DATATYPE_ALL ID_ {add_to_symbol_table(func,$2.name)} B_OPEN B_CLOSE BODY {$$.nd=bootstrap_node($1.nd,$2.nd,$2.name);}
-;
 
 %%
-
-void check_if_not_declared(char * name){
-     for(int j=0;j<symbol_table_counter;j++){
-                if(strcmp(symbol_table[j].name,name)==0){
-                    return;
-                };
-                
-            }
-            char * m = (char *)malloc(10);
-                sprintf(m,"Not declared: %s",name);
-                yyerror(m);
-                exit(1);
-}
-
-void add_to_symbol_table(enum VarType vt,char * name) {
-     for(int j=0;j<symbol_table_counter;j++){
-                if(strcmp(symbol_table[j].name,name)==0){
-                    char * m = (char *)malloc(10);
-                    sprintf(m,"Exist: %s",name);
-                    yyerror(m);
-                    exit(1);
-                };
-            }
-        if(vt == var) {
-			symbol_table[symbol_table_counter].name=strdup(name);
-			symbol_table[symbol_table_counter].datatype=strdup(current_data_type);
-			symbol_table[symbol_table_counter].line_no=line_no;
-			symbol_table[symbol_table_counter].type=strdup("Variable");
-		}
-		else if(vt == func) {
-			symbol_table[symbol_table_counter].name=strdup(name);
-			symbol_table[symbol_table_counter].datatype=strdup(current_data_type);
-			symbol_table[symbol_table_counter].line_no=line_no;
-			symbol_table[symbol_table_counter].type=strdup("Function");
-		}
-        symbol_table_counter++;
-	}
-
-void print_symbol_table(){
-    printf("Symbol table\n");
-    for (int i = 0; i < symbol_table_counter; i++){
-        struct SymbolTable c_symbol_table = symbol_table[i];
-        printf("%s  %s  %s %d\n",c_symbol_table.name,c_symbol_table.datatype,c_symbol_table.type,c_symbol_table.line_no);
-    }
-}
-
-void preOrder(struct token_node *tree) {
-    if(tree){
-        printf("%s, ", tree->val);
-        preOrder(tree->left);
-        preOrder(tree->right);
-    }
-}
-void printtree(struct token_node* tree) {
-	printf("\n\n preorder traversal of the Parse Tree: \n\n");
-	preOrder(tree);
-	printf("\n\n");
-}
-
-void print_tac(){
-    printf("Three Address Code\n");
-    for (int i = 0; i < tac; i++){
-    }
-}
 
 int main(){
+    set_vars();
     yyparse();
-    print_symbol_table();
-    printtree(head);
-    print_tac();
+    TheModule->print(llvm::outs(), nullptr);
 }
 
-
-
-//max new phases
-//lexical -> l vale
-//syntax -> tree
-//intermidiate -> tac

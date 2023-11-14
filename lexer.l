@@ -5,12 +5,10 @@
 %}
 alpha [a-zA-Z]+
 id ({alpha}+[0-9]*)+
-header #include[ ]<[a-z]+\.h>
 datatype "int"|"float"|"char"
 digit [0-9]+(\.[0-9]+)?
 string_literal \".*\"
-comp "=="|"<"|">"|"<="
-unary "++"|"--"
+eq "="
 %%
 
 (\/\*)(\n|.)*(\*\/) {
@@ -19,74 +17,49 @@ unary "++"|"--"
 
 (\/\/).* {
 }
-{header} { 
-    if(in_comment==0){
-        strcpy(yylval.token_data.name,(yytext));
-        return INCLUDES;
-    }
-}
-"int" {
-    if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return INT;}}
-{datatype} {
-    if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return DATATYPE;}}
-{digit} {
-    if(in_comment==0){
-    
-    strcpy(yylval.token_data.name,(yytext));return NUMBER;
-    }}
 "main" {
     if(in_comment==0){
     
-    strcpy(yylval.token_data.name,(yytext));return MAIN;
+    strcpy(yylval.token_data.value,(yytext));return MAIN;
     }}
 "(" {
     if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return B_OPEN;}
+    strcpy(yylval.token_data.value,(yytext));return B_OPEN;}
     }
 ")" {
     if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return B_CLOSE;}
+    strcpy(yylval.token_data.value,(yytext));return B_CLOSE;}
     }
 "{" {
     if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return C_OPEN;}
+    strcpy(yylval.token_data.value,(yytext));return C_OPEN;}
     }
 "}" {
     if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return C_CLOSE;}
+    strcpy(yylval.token_data.value,(yytext));return C_CLOSE;}
     }
-"=" {
+"int" {
     if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return EQL;}
+    strcpy(yylval.token_data.value,(yytext));return INT;}}
+
+{digit} {
+    if(in_comment==0){
+    
+    strcpy(yylval.token_data.value,(yytext));return NUMBER;
+    }}
+
+{eq} {
+    if(in_comment==0){
+    strcpy(yylval.token_data.value,(yytext));return EQ;}
     }
+
 ";" {
     if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return SEMI;}
+    strcpy(yylval.token_data.value,(yytext));return SEMI;}
     }
-{comp} {
-    if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return COMP;}
-    }
-{string_literal} {
-    if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return STR_LITERAL;}
-    }
-{unary} {
-    if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return UNARY;} 
-    }
-"for" {
-    if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return FOR;}
-    }
-"while" {
-    if(in_comment==0){
-    strcpy(yylval.token_data.name,(yytext));return WHILE;}
-    }
+
 "\n" line_no++;
 [ \t]+ ;
-{id} {strcpy(yylval.token_data.name,(yytext));return ID_;}
+{id} {strcpy(yylval.token_data.value,(yytext));return ID_;}
 %%
 

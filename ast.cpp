@@ -14,16 +14,31 @@
 using namespace llvm;
 using namespace std;
 
-static LLVMContext *TheContext = nullptr;
-static IRBuilder<> *Builder = nullptr;
-static Module *TheModule = nullptr;
-static map<std::string, Value *> NamedValues;
+LLVMContext *TheContext = nullptr;
+IRBuilder<> *Builder = nullptr;
+Module *TheModule = nullptr;
+map<std::string, Value *> NamedValues;
 
 void set_vars()
 {
     TheContext = new LLVMContext();
     Builder = new IRBuilder(*TheContext);
     TheModule = new Module("mini c JIT", *TheContext);
+
+    // Create a function to insert our variable into
+    auto *funcType = llvm::FunctionType::get(Builder->getInt32Ty(), false);
+    auto *mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", TheModule);
+
+    // Create a basic block in the function
+    auto *entry = llvm::BasicBlock::Create(*TheContext, "entrypoint", mainFunc);
+    Builder->SetInsertPoint(entry);
+}
+
+void exp()
+{
+    auto var = Builder->CreateAlloca(Builder->getInt32Ty(), 0, "max");
+    Builder->CreateStore(Builder->getInt32(0), var);
+    TheModule->print(llvm::outs(), nullptr);
 }
 class ExprNode
 {
