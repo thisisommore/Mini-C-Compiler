@@ -1,6 +1,6 @@
 %{
  int line_no=1;
- #include "minic.tab.h"
+ #include "parser.hpp"
  int in_comment = 0;
 %}
 alpha [a-zA-Z]+
@@ -87,6 +87,6 @@ unary "++"|"--"
     }
 "\n" line_no++;
 [ \t]+ ;
-{id} {strcpy(yylval.token_data.name,(yytext));return ID;}
+{id} {strcpy(yylval.token_data.name,(yytext));return ID_;}
 %%
 
