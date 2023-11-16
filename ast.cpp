@@ -34,10 +34,19 @@ void set_vars()
     Builder->SetInsertPoint(entry);
 }
 
+// Test code for testing/experimenting with the api of llvm, this function is never executed
 void exp()
 {
     auto var = Builder->CreateAlloca(Builder->getInt32Ty(), 0, "max");
+    auto if_block = BasicBlock::Create(*TheContext, "if_block", nullptr);
+    Value *end_block = BasicBlock::Create(*TheContext, "end_block", nullptr);
     Builder->CreateStore(Builder->getInt32(0), var);
+    auto cond = Builder->CreateICmpEQ(var, var, "cond");
+    Builder->CreateCondBr(cond, if_block, (BasicBlock *)end_block);
+    Builder->SetInsertPoint((BasicBlock *)if_block);
+    //...
+    Builder->SetInsertPoint((BasicBlock *)end_block);
+
     TheModule->print(llvm::outs(), nullptr);
 }
 class ExprNode

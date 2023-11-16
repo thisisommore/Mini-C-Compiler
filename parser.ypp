@@ -7,10 +7,12 @@
 %{
 extern int line_no;
 #include <stdio.h>
-#include <string.h>
+  #include "ast.hpp"
+#include <string>
+map<std::string,Value *> symbol;
 #include "lexer.hpp"
 void yyerror(const char *s) {
-    fprintf(stderr, "Error: %s\n", s);
+    fprintf(stderr, "%d, Error: %s\n",line_no, s);
 }
 
 %}
@@ -22,10 +24,11 @@ void yyerror(const char *s) {
 		char value[100];
         enum E_l_type l_type; 
 		struct ExprNode* nd;
+        Value* v;
 	} token_data; 
 } 
 
-%token <token_data> INT ID_ NUMBER SEMI EQ MAIN C_OPEN C_CLOSE B_OPEN B_CLOSE
+%token <token_data> INT ID_ NUMBER SEMI EQ MAIN C_OPEN C_CLOSE B_OPEN B_CLOSE IF
 %type <token_data> STATEMENTS LITERAL
 
 %%
@@ -36,9 +39,25 @@ PROGRAM: INT MAIN B_OPEN B_CLOSE BODY
 BODY: C_OPEN STATEMENTS C_CLOSE
 STATEMENTS:  STATEMENT STATEMENTS 
             | ;
-STATEMENT: INT ID_ EQ NUMBER {
+STATEMENT: ASSIGNMENT 
+    | IF B_OPEN ID_ EQ EQ ID_ B_CLOSE {
+        auto func=Builder->GetInsertBlock()->getParent();
+    auto if_block = BasicBlock::Create(*TheContext, "if_block", func);
+    auto end_block = BasicBlock::Create(*TheContext, "end_block", func);
+    auto cond = Builder->CreateICmpEQ(symbol[$3.value], symbol[$6.value], "cond");
+    Builder->CreateCondBr(cond, if_block, end_block);
+    Builder->SetInsertPoint(if_block);
+    $1.v=end_block;
+} BODY {
+    Builder->CreateBr((BasicBlock *)$1.v);
+    Builder->SetInsertPoint((BasicBlock *)$1.v);
+}
+
+ASSIGNMENT: INT ID_ EQ NUMBER {
     auto var = Builder->CreateAlloca(Builder->getInt32Ty(), 0, $2.value);
     Builder->CreateStore(Builder->getInt32(stoi($4.value)), var);
+    $2.v=var;
+    symbol[$2.value]=var;
 } SEMI
 
 

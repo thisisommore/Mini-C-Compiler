@@ -26,6 +26,14 @@ eq "="
     if(in_comment==0){
     strcpy(yylval.token_data.value,(yytext));return B_OPEN;}
     }
+"=" {
+    if(in_comment==0){
+    strcpy(yylval.token_data.value,(yytext));return EQ;}
+    }
+"if" {
+    if(in_comment==0){
+    strcpy(yylval.token_data.value,(yytext));return IF;}
+    }
 ")" {
     if(in_comment==0){
     strcpy(yylval.token_data.value,(yytext));return B_CLOSE;}
@@ -57,7 +65,6 @@ eq "="
     if(in_comment==0){
     strcpy(yylval.token_data.value,(yytext));return SEMI;}
     }
-
 "\n" line_no++;
 [ \t]+ ;
 {id} {strcpy(yylval.token_data.value,(yytext));return ID_;}
