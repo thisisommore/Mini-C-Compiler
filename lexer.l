@@ -30,6 +30,14 @@ eq "="
     if(in_comment==0){
     strcpy(yylval.token_data.value,(yytext));return EQ;}
     }
+">" {
+    if(in_comment==0){
+    strcpy(yylval.token_data.value,(yytext));return GT;}
+    }
+"<" {
+    if(in_comment==0){
+    strcpy(yylval.token_data.value,(yytext));return LT;}
+    }
 "if" {
     if(in_comment==0){
     strcpy(yylval.token_data.value,(yytext));return IF;}

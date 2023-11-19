@@ -88,3 +88,11 @@ class VariableExpr : public ExprNode
     VariableExpr(string name) : name(name), bb(bb), initialValue(initialValue){};
     AllocaInst *codegen() override;
 };
+
+class CmpExpr : public ExprNode
+{
+public:
+    llvm::CmpInst::Predicate predicate;
+    CmpExpr(llvm::CmpInst::Predicate predicate) : predicate(predicate){};
+    Value *codegen() override;
+};

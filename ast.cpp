@@ -9,6 +9,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
+#include "ast.hpp"
 #include <map>
 
 using namespace llvm;
@@ -42,6 +43,7 @@ void exp()
     Value *end_block = BasicBlock::Create(*TheContext, "end_block", nullptr);
     Builder->CreateStore(Builder->getInt32(0), var);
     auto cond = Builder->CreateICmpEQ(var, var, "cond");
+
     Builder->CreateCondBr(cond, if_block, (BasicBlock *)end_block);
     Builder->SetInsertPoint((BasicBlock *)if_block);
     //...
@@ -49,107 +51,70 @@ void exp()
 
     TheModule->print(llvm::outs(), nullptr);
 }
-class ExprNode
-{
-public:
-    virtual Value *codegen() = 0;
-};
 
-class NumberNode : public ExprNode
+Value *NumberNode::codegen()
 {
-public:
-    int number;
-    NumberNode(const double &number) : number(number) {}
+    return ConstantInt::get(*TheContext, APInt(32, number, true));
+}
 
-    Value *codegen() override
+Function *FunctionD::codegen()
+{
+    auto FT = FunctionType::get(returnType, argsType, false);
+    auto F = Function::Create(FT, Function::ExternalLinkage, name, TheModule);
+    auto idx = 0;
+    for (auto &arg : F->args())
+        arg.setName(argNames[idx++]);
+
+    auto BB = BasicBlock::Create(*TheContext, "entry", F);
+    Builder->SetInsertPoint(BB);
+    if (auto BodyVal = body->codegen())
     {
-        return ConstantInt::get(*TheContext, APInt(32, number, true));
+        Builder->CreateRet(BodyVal);
+        return F;
     }
-};
+    F->eraseFromParent();
+    return nullptr;
+}
 
-class FunctionD : public ExprNode
+Value *FunctionC::codegen()
 {
-
-    Type *returnType;
-    string name;
-    vector<Type *> argsType;
-    vector<string> argNames;
-    ExprNode *body;
-    FunctionD(Type *returnType,
-              string name,
-              vector<Type *> argsType,
-              vector<string> argNames,
-              ExprNode *body) : returnType(returnType), name(name), argsType(argsType), argNames(argNames), body(body){};
-
-    Value *codegen() override
+    auto calle = TheModule->getFunction(functionName);
+    // TODO error if no calle
+    // TODO error if no size match of args
+    vector<Value *> valueArgs;
+    for (auto a : args)
     {
-        auto FT = FunctionType::get(returnType, argsType, false);
-        auto F = Function::Create(FT, Function::ExternalLinkage, name, TheModule);
-        auto idx = 0;
-        for (auto &arg : F->args())
-            arg.setName(argNames[idx++]);
+        valueArgs.push_back(a->codegen());
+    }
+    return Builder->CreateCall(calle, valueArgs, "calltmp");
+}
 
-        auto BB = BasicBlock::Create(*TheContext, "entry", F);
-        Builder->SetInsertPoint(BB);
-        if (auto BodyVal = body->codegen())
-        {
-            Builder->CreateRet(BodyVal);
-            return F;
-        }
-        F->eraseFromParent();
+Value *BinaryExpr::codegen()
+{
+    auto ValL = LHS->codegen();
+    auto ValR = LHS->codegen();
+    switch (OP)
+    {
+    case '+':
+        return Builder->CreateFAdd(ValL, ValR, "addtmp");
+        break;
+    case '-':
+        return Builder->CreateFSub(ValL, ValR, "subtmp");
+        break;
+    case '/':
+        return Builder->CreateFDiv(ValL, ValR, "divtmp");
+        break;
+    case '*':
+        return Builder->CreateFMul(ValL, ValR, "multmp");
+        break;
+
+    default:
         return nullptr;
+        break;
     }
-};
+}
 
-class FunctionC : public ExprNode
+Value *CmpExpr::codegen()
 {
-    vector<NumberNode> *args;
-    StringRef functionName;
-    FunctionC(vector<NumberNode> *args, StringRef functionName) : args(args), functionName(functionName) {}
-    Value *codegen() override
-    {
-        auto calle = TheModule->getFunction(functionName);
-        // TODO error if no calle
-        // TODO error if no size match of args
-        vector<Value *> valueArgs;
-        for (auto a : *args)
-        {
-            valueArgs.push_back(a.codegen());
-        }
-        return Builder->CreateCall(calle, valueArgs, "calltmp");
-    }
-};
-
-class BinaryExpr : public ExprNode
-{
-    ExprNode *LHS;
-    ExprNode *RHS;
-    char OP;
-    BinaryExpr(ExprNode *LHS,
-               ExprNode *RHS,
-               char OP) : LHS(LHS), RHS(RHS), OP(OP){};
-    Value *codegen() override
-    {
-        auto ValL = LHS->codegen();
-        auto ValR = LHS->codegen();
-        switch (OP)
-        {
-        case '+':
-            return Builder->CreateFAdd(ValL, ValR, "addtmp");
-            break;
-        case '-':
-            return Builder->CreateFSub(ValL, ValR, "subtmp");
-            break;
-        case '/':
-            return Builder->CreateFDiv(ValL, ValR, "divtmp");
-            break;
-        case '*':
-            return Builder->CreateFMul(ValL, ValR, "multmp");
-            break;
-
-        default:
-            return nullptr;
-            break;
-        }
-    }
-};
+    return nullptr;
+}

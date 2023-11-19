@@ -28,8 +28,8 @@ void yyerror(const char *s) {
 	} token_data; 
 } 
 
-%token <token_data> INT ID_ NUMBER SEMI EQ MAIN C_OPEN C_CLOSE B_OPEN B_CLOSE IF
-%type <token_data> STATEMENTS LITERAL
+%token <token_data> INT ID_ NUMBER SEMI EQ MAIN C_OPEN C_CLOSE B_OPEN B_CLOSE IF GT LT
+%type <token_data> STATEMENTS LITERAL COMP
 
 %%
 
@@ -40,11 +40,14 @@ BODY: C_OPEN STATEMENTS C_CLOSE
 STATEMENTS:  STATEMENT STATEMENTS 
             | ;
 STATEMENT: ASSIGNMENT 
-    | IF B_OPEN ID_ EQ EQ ID_ B_CLOSE {
-        auto func=Builder->GetInsertBlock()->getParent();
+    | IF_DEFINATION
+
+IF_DEFINATION: IF B_OPEN ID_ COMP ID_ B_CLOSE {
+    auto func=Builder->GetInsertBlock()->getParent();
     auto if_block = BasicBlock::Create(*TheContext, "if_block", func);
     auto end_block = BasicBlock::Create(*TheContext, "end_block", func);
-    auto cond = Builder->CreateICmpEQ(symbol[$3.value], symbol[$6.value], "cond");
+    CmpExpr* cmpExpr=(CmpExpr*)$4.nd;
+    auto cond = Builder->CreateICmp(cmpExpr->predicate,symbol[$3.value], symbol[$5.value], "cond");
     Builder->CreateCondBr(cond, if_block, end_block);
     Builder->SetInsertPoint(if_block);
     $1.v=end_block;
@@ -52,6 +55,12 @@ STATEMENT: ASSIGNMENT
     Builder->CreateBr((BasicBlock *)$1.v);
     Builder->SetInsertPoint((BasicBlock *)$1.v);
 }
+
+COMP: EQ EQ {$$.nd=new CmpExpr(ICmpInst::ICMP_EQ);} 
+    | LT EQ {$$.nd=new CmpExpr(ICmpInst::ICMP_SLE);} 
+    | GT EQ {$$.nd=new CmpExpr(ICmpInst::ICMP_SGE);} 
+    | GT    {$$.nd=new CmpExpr(ICmpInst::ICMP_SGT);} 
+    | LT    {$$.nd=new CmpExpr(ICmpInst::ICMP_SLT);} 
 
 ASSIGNMENT: INT ID_ EQ NUMBER {
     auto var = Builder->CreateAlloca(Builder->getInt32Ty(), 0, $2.value);
