@@ -24,7 +24,7 @@ void set_vars()
 {
     TheContext = new LLVMContext();
     Builder = new IRBuilder(*TheContext);
-    TheModule = new Module("mini c JIT", *TheContext);
+    TheModule = new Module("mini c", *TheContext);
 
     // Create a function to insert our variable into
     auto *funcType = llvm::FunctionType::get(Builder->getInt32Ty(), false);
