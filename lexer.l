@@ -5,9 +5,7 @@
 %}
 alpha [a-zA-Z]+
 id ({alpha}+[0-9]*)+
-datatype "int"|"float"|"char"
 digit [0-9]+(\.[0-9]+)?
-string_literal \".*\"
 eq "="
 %%
 
